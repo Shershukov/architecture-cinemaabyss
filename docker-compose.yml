@@ -58,6 +58,11 @@ services:
     container_name: cinemaabyss-monolith
     depends_on:
       - postgres
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d cinemaabyss" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     ports:
       - "8080:8080"
     environment:
@@ -72,6 +77,11 @@ services:
       context: ./src/microservices/movies
       dockerfile: Dockerfile
     container_name: cinemaabyss-movies-service
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d cinemaabyss" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       - postgres
     ports:
@@ -117,7 +127,7 @@ services:
       MOVIES_SERVICE_URL: http://movies-service:8081
       EVENTS_SERVICE_URL: http://events-service:8082
       GRADUAL_MIGRATION: "true"
-      MOVIES_MIGRATION_PERCENT: "50"
+      MOVIES_MIGRATION_PERCENT: "60"
     networks:
       - cinemaabyss-network
 
