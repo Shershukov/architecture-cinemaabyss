@@ -36,7 +36,7 @@ if GRADUAL_MIGRATION:
     if not (0 <= MOVIES_MIGRATION_PERCENT <= 100):
         sys.exit(1)
 else:
-    MOVIES_MIGRATION_PERCENT = 0  # не используется, но определено для безопасности
+    MOVIES_MIGRATION_PERCENT = 0
 
 
 def should_route_to_movies() -> bool:
@@ -83,8 +83,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({"status": True}, ensure_ascii=False).encode("utf-8"))
             return
-
-        if path.startswith("/api/movies"):
+        elif path.startswith("/api/movies"):
             if should_route_to_movies():
                 target_url = MOVIES_SERVICE_URL
             else:
