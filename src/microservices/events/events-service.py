@@ -3,13 +3,14 @@ import os
 import sys
 import json
 import threading
+import time
 from collections import deque
 from datetime import datetime, timezone
+from kafka import KafkaProducer, KafkaConsumer
 
 PORT = int(os.getenv("PORT", "8082"))
-KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BROKERS", "kafka:9092")  # ← именно KAFKA_BROKERS
+KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BROKERS", "kafka:9092")
 
-# Топики
 TOPICS = {
     "user": "user-events",
     "payment": "payment-events",
@@ -105,21 +106,38 @@ class EventHandler(BaseHTTPRequestHandler):
 
 def kafka_consumer_worker():
     topics = list(TOPICS.values())
-    print(f"Подключение к Kafka: {KAFKA_BOOTSTRAP_SERVERS}", flush=True)
+    max_retries = 10
+    retry_delay = 5
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            print(f"Попытка подключения к Kafka ({attempt}/{max_retries})...", flush=True)
+            consumer = KafkaConsumer(
+                *topics,
+                bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
+                value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+                auto_offset_reset="earliest",
+                group_id="events-service",
+                # Добавим таймауты для быстрого фейла
+                request_timeout_ms=20000,
+                session_timeout_ms=10000,
+                heartbeat_interval_ms=3000
+            )
+            print(f"Успешно подключено к Kafka: {KAFKA_BOOTSTRAP_SERVERS}", flush=True)
+            break  # Успех — выходим из цикла
+        except Exception as e:
+            print(f"Ошибка подключения к Kafka (попытка {attempt}): {e}", file=sys.stderr, flush=True)
+            if attempt == max_retries:
+                print("Превышено количество попыток. Консьюмер остановлен.", file=sys.stderr, flush=True)
+                return
+            time.sleep(retry_delay)
+    else:
+        return
 
     try:
-        consumer = KafkaConsumer(
-            *topics,
-            bootstrap_servers=KAFKA_BOOTSTRAP_SERVERS,
-            value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-            auto_offset_reset="earliest",
-            group_id="events-service"
-        )
-
         for message in consumer:
             if shutdown_event.is_set():
                 break
-
             event = message.value
             topic = message.topic
 
@@ -132,17 +150,17 @@ def kafka_consumer_worker():
             if event_type and event_type in event_buffers:
                 event_buffers[event_type].append(event)
                 ts = datetime.now().isoformat()
-                print(f"[{ts}] 📥 {event_type.upper()}: {event}", flush=True)
-
+                print(f"[{ts}] {event_type.upper()}: {event}", flush=True)
     except Exception as e:
-        print(f"Ошибка: {e}", file=sys.stderr)
+        print(f"Ошибка при чтении сообщений: {e}", file=sys.stderr, flush=True)
+    finally:
+        consumer.close()
 
 
 def main():
     consumer_thread = threading.Thread(target=kafka_consumer_worker, daemon=True)
     consumer_thread.start()
 
-    # В Docker обязательно 0.0.0.0, а не 127.0.0.1!
     server = HTTPServer(("0.0.0.0", PORT), EventHandler)
     print(f"Events service запущен на порту {PORT}", flush=True)
 
