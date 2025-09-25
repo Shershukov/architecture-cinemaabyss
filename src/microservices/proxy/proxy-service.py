@@ -23,7 +23,6 @@ def get_required_int_env(var_name: str) -> int:
 PORT = get_required_int_env("PORT")
 MONOLITH_URL = get_required_env("MONOLITH_URL")
 MOVIES_SERVICE_URL = get_required_env("MOVIES_SERVICE_URL")
-EVENTS_SERVICE_URL = get_required_env("EVENTS_SERVICE_URL")
 GRADUAL_MIGRATION_RAW = os.getenv("GRADUAL_MIGRATION", "false").lower()
 if GRADUAL_MIGRATION_RAW in ("true", "1", "yes", "on"):
     GRADUAL_MIGRATION = True
@@ -90,8 +89,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 target_url = MOVIES_SERVICE_URL
             else:
                 target_url = MONOLITH_URL
-        elif path.startswith("/api/events"):
-            target_url = EVENTS_SERVICE_URL
         else:
             target_url = MONOLITH_URL
 
