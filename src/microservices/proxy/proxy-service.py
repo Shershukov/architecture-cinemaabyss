@@ -4,6 +4,7 @@ import random
 import sys
 import urllib.request
 import urllib.error
+import json
 from urllib.parse import urljoin
 
 def get_required_env(var_name: str) -> str:
@@ -77,6 +78,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def _proxy_request(self):
         path = self.path
+        if path == "/api/proxy/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(json.dumps({"status": True}, ensure_ascii=False).encode("utf-8"))
+            return
 
         if path.startswith("/api/movies"):
             if should_route_to_movies():
