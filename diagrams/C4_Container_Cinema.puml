@@ -1,0 +1,59 @@
+@startuml C4_Context_Warmhouse
+!include samples/C4.puml
+!include samples/C4_Context.puml
+!include samples/C4_Component.puml
+
+title "Система управления умным домом компании "Теплый дом""
+
+Person(user, "Пользователь")
+Person(administrator, "Администратор")
+System_Boundary(c1, "Система управления умным домом") {
+ Container(api_gateway, "Обратный прокси", "NGINX")
+ Container(user_management, "Управление пользователями", "Java, Spring")
+ Container(subscription_management, "Управление подписками", "Java, Spring")
+ ContainerDb(user_database, "Users Database", "PostgreSQL")
+ ContainerDb(subscription_database, "Subscriptions Database", "PostgreSQL")
+ Container(transaction_management, "Управление платежными транзакциями", "Java, Spring")
+ ContainerDb(transaction_database, "Transaction Database", "PostgreSQL")
+ Container(film_management, "Управление фильмами", "Java, Spring")
+ ContainerDb(film_database, "Film Database", "PostgreSQL")
+ ContainerDb(s3_video_storage, "Film Storage", "S3")
+
+ Container(error_monitor, "Монитор ошибок", "Java, Spring")
+ ContainerDb(error_monitor_database, "Monitor Database", "Clickhouse")
+}
+System_Ext(email, "Email server")
+System_Ext(recommendation_system, "Система рекомендаций")
+System_Ext(processing, "Bank Processing System")
+
+Rel_D(user, api_gateway, "Используя", "HTTPS")
+Rel_D(user, api_gateway, "Используя", "gRPC")
+Rel_D(api_gateway, subscription_management, "Используя", "HTTPS")
+Rel_D(api_gateway, subscription_management, "Используя", "HTTPS")
+Rel_D(api_gateway, transaction_management, "Используя", "Kafka,HTTPS")
+Rel_D(transaction_management, api_gateway, "Используя", "WebSocket,HTTPS")
+Rel_D(api_gateway, film_management, "Используя", "HTTPS")
+Rel_D(api_gateway, s3_video_storage, "Используя", "gRPC")
+
+Rel(subscription_management, error_monitor, "Используя", "Kafka,HTTPS")
+Rel(transaction_management, error_monitor, "Используя", "Kafka,HTTPS")
+Rel(film_management, error_monitor, "Используя", "Kafka,HTTPS")
+
+Rel_D(administrator, api_gateway, "Используя", "HTTPS")
+
+Rel_D(user_management, user_database, "", "Reads/Writes")
+Rel_D(subscription_management, subscription_database, "", "Reads/Writes")
+Rel_D(transaction_management, transaction_database, "", "Reads/Writes")
+Rel_D(film_management, film_database, "", "Reads/Writes")
+Rel_D(error_monitor, error_monitor_database, "", "Reads/Writes")
+
+Rel_L(recommendation_system, film_management, "Используя", "RabbitMQ")
+
+Rel_D(transaction_management, processing, "Используя", "HTTPS")
+Rel_D(film_management, processing, "Используя", "HTTPS")
+
+Rel_U(email, user, "Отправляет email")
+Rel_D(user_management, email, "Отправка email с помощью")
+Rel_D(subscription_management, user_management, "Используя", "Kafka,HTTPS")
+Rel_D(transaction_management, email, "Используя", "Kafka,HTTPS")
+@enduml
